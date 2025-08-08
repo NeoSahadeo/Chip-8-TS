@@ -1,30 +1,68 @@
-import CanvasX from "./canvas";
-import CPU from "./cpu";
-import InputHandler from "./input";
-import MMU from "./mmu";
+import { cycle, initialize, type CPU } from "./cpu";
+import { Chip8Display } from "./canvas";
 
-function main() {
-  const canvas_element = document.getElementById("canvas");
-  if (!canvas_element) return;
+//load rom
+const input = document.querySelector("#fileInput") as HTMLInputElement;
+const reader = new FileReader();
+let clock = 0;
+let rom = "";
 
-  const canvasx = new CanvasX(canvas_element as HTMLCanvasElement);
-  const mmu = new MMU();
-  const input_handler = new InputHandler();
-  const cpu = new CPU(mmu, canvasx, input_handler);
-  const instr = [
-    0x00e0, 0xa22a, 0x600c, 0x6108, 0xd01f, 0x7009, 0xa239, 0xd01f, 0xa248,
-    0x7008, 0xd01f, 0x7004, 0xa257, 0xd01f, 0x7008, 0xa266, 0xd01f, 0x7008,
-    0xa275, 0xd01f, 0x1228, 0xff00, 0xff00, 0x3c00, 0x3c00, 0x3c00, 0x3c00,
-    0xff00, 0xffff, 0x00ff, 0x0038, 0x003f, 0x003f, 0x0038, 0x00ff, 0x00ff,
-    0x8000, 0xe000, 0xe000, 0x8000, 0x8000, 0xe000, 0xe000, 0x80f8, 0x00fc,
-    0x003e, 0x003f, 0x003b, 0x0039, 0x00f8, 0x00f8, 0x0300, 0x0700, 0x0f00,
-    0xbf00, 0xfb00, 0xf300, 0xe300, 0x43e0, 0x00e0, 0x0080, 0x0080, 0x0080,
-    0x0080, 0x00e0, 0x00e0,
-  ];
-  for (let x = 0; x < 500; x++) {
-    cpu.execute(instr[cpu.PC]);
-    cpu.PC += 2;
-  }
+reader.onload = function(e) {
+	if (!e) return;
+	rom = "";
+	const result = e.target!.result as ArrayBuffer;
+	const bytes = new Uint8Array(result);
+	for (let x = 0; x < bytes.length; x++) {
+		const byte = bytes[x];
+		let byte_string = byte.toString(16);
+		if (byte_string.length < 2) {
+			byte_string = "0" + byte_string;
+		}
+		rom += byte_string;
+	}
+	main();
+};
+
+reader.onerror = function(e) {
+	console.error("File read error", e);
+};
+
+if (input) {
+	input.addEventListener("change", () => {
+		const file = input!.files![0];
+		if (file) {
+			reader.readAsArrayBuffer(file);
+		}
+	});
 }
+const main = () => {
+	clearInterval(clock);
 
-main();
+	const display = new Chip8Display(10);
+	let cpu: CPU = {
+		memory: new Uint8Array(4096),
+		graphics: new Uint8Array(64 * 32),
+		registers: new Uint8Array(16),
+		keys: new Uint8Array(16),
+		stack: new Uint8Array(16),
+
+		PC: 0x200,
+		delay_timer: 0,
+		sound_timer: 0,
+		opcode: 0,
+		I: 0,
+		SP: 0,
+		display: display,
+	} as any;
+	initialize(cpu);
+
+	for (let i = 0; i < rom.length; i += 2) {
+		const hexByte = rom.substr(i, 2); // get each pair of hex chars
+		cpu.memory[0x200 + i / 2] = parseInt(hexByte, 16); // parse hex byte and store
+	}
+	console.log(rom);
+	clock = setInterval(() => {
+		cycle(cpu);
+		display.updateDisplay(cpu.graphics);
+	}, 16);
+};
