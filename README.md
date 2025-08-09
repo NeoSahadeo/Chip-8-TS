@@ -1,6 +1,6 @@
 # Chip 8 Emulator in Typescript
 
-!(Chip 8 IBM Logo)[https://i.imgur.com/7Y3N2qH.png]
+![Chip 8 IBM Logo](https://i.imgur.com/7Y3N2qH.png)
 
 
 # Quickstart
